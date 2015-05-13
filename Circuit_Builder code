@@ -1,0 +1,331 @@
+"""
+Circuit Builder
+by Levonlin and Zach
+"""
+
+
+"Define functions"
+# Check the distance of two points
+def distance(point1, point2):
+    return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+
+# Function mostly used for the mouseclick handler to test
+# if point(at position "pos") is inside of a quadrilateral
+# that's width begins at "width_start", ends at "width_end", 
+# and anyway, you can guess for it's height
+def in_square(pos, width_start, width_end, height_start, height_end):
+    if (pos[0] <= width_end) and (pos[0] >= width_start) and (pos[1] <= height_end) and (pos[1] >= height_start):
+        return True
+    else:
+        return False
+
+# Convert, for example, rgba(255, 0, 0, 1) to
+# "rgba(255, 0, 0, 1)", so that I don't have to do things
+# like "'rgba(255, 0, 0, " + light + ")", and,
+# instead, I can just do "rgba(255, 0, 0, light)"
+def rgba(red, green, blue, alpha):
+    return "rgba(" + str(red) + ", " + str(green) + ", " + str(blue) + ", " + str(alpha)
+
+def string_to_list(string):
+    lst = []
+    for char in string:
+        lst.append(char)
+    return lst
+
+def list_to_string(lst):
+    string = ""
+    for item in lst:
+        string += item
+    return string
+
+class Parts:
+    class PartsSection:
+        def __init__(self, name, vertical_pos, normal_start_pos = True, color = "Black"):
+            if normal_start_pos == True:
+                self.vertical_pos = vertical_pos + search_scroll_pos + 100
+            else:
+                self.vertical_pos = vertical_pos + search_scroll_pos
+            self.name = name
+            self.original_vertical_pos = vertical_pos
+            self.color = color
+            self.normal_start_pos = normal_start_pos
+        def draw(self, canvas):
+            if self.normal_start_pos:
+                self.vertical_pos = self.original_vertical_pos + search_scroll_pos + 100
+            else:
+                self.vertical_pos = self.original_vertical_pos + search_scroll_pos
+            canvas.draw_text(self.name, [WIDTH / 70, self.vertical_pos], 20, self.color)
+            canvas.draw_line([WIDTH / 100, self.vertical_pos + 2], [WIDTH / 8 - WIDTH / 100, self.vertical_pos + 2], 2, self.color)
+        def get_vertical_pos(self):
+            return self.vertical_pos
+        def get_original_vertical_pos(self):
+            return self.original_vertical_pos
+        def get_color(self):
+            return self.color
+    class Part:
+        def __init__(self, name, pos, color = "Black", size = 50, normal_start_pos = True):
+            self.name = name
+            self.pos = pos
+            self.original_pos = list(pos)
+            if normal_start_pos:
+                self.pos[1] = self.pos[1] + search_scroll_pos + 100
+            else:
+                self.pos[1] = self.pos[1] + search_scroll_pos
+            self.original_pos2 = list(pos)
+            self.color = color
+            self.size = size
+            self.normal_start_pos = normal_start_pos
+            self.clicked = False
+        def draw(self, canvas, horizontal_text_start_pos):
+            self.pos[1] = self.original_pos2[1] + search_scroll_pos
+            canvas.draw_polygon([(self.pos[0] - self.size / 2, self.pos[1] - self.size / 2), (self.pos[0] + self.size / 2, self.pos[1] - self.size / 2), (self.pos[0] + self.size / 2, self.pos[1] + self.size / 2), (self.pos[0] - self.size / 2, self.pos[1] + self.size / 2)], 2, self.color)
+            canvas.draw_line([self.pos[0] - self.size / 2, (self.pos[1] + self.size / 2) - self.size / 5], [self.pos[0] + self.size / 2, (self.pos[1] + self.size / 2) - self.size / 5], 2, self.color)
+            canvas.draw_text(self.name, [self.pos[0] - self.size / 2 + horizontal_text_start_pos, self.pos[1] + self.size / 2], self.size / 4, self.color)
+        def mouseclick(self, pos):
+            if in_square(pos, self.pos[0] - self.size / 2, self.pos[0] + self.size / 2, self.pos[1] - self.size / 2, self.pos[1] + self.size):
+                self.clicked = True
+            else:
+                self.clicked = False
+        def get_clicked(self):
+            return self.clicked
+        def get_original_pos(self):
+            return self.original_pos
+        def set_color(self, color):
+            self.color = color
+
+def delete_all():
+    global wires, wire_points
+    wires, wire_points = [], []
+
+def draw(canvas):
+    global search_text_start_pos, search_text
+    # Light grey rectangle with a black outline that you 
+    # take parts from to use in your circuits
+    canvas.draw_polygon([(WIDTH / 8, 0), (WIDTH / 8, HEIGHT), (0, HEIGHT), (0, 0)], 2, "Black", rgba(150, 150, 150, 1))
+    # Black rectangle to block the info about what key you
+    # pressed or released, and the info about your mouse
+    # when you use it. This is at the bottom of the canvas 
+    canvas.draw_polygon([(0, HEIGHT - 80), (WIDTH / 8, HEIGHT - 80), (WIDTH / 8, HEIGHT), (0, HEIGHT)], 1, "Black", "Black")
+    # A second black box, except with it's vertical
+    # positions inverted to make it be at the top. I put
+    # this here to make the parts area look even, and to
+    # put the search box in. This is at the top of the 
+    # canvas
+    canvas.draw_polygon([(0, 80), (WIDTH / 8, 80), (WIDTH / 8, 0), (0, 0)], 1, "Black", "Black")
+    #-------------------------------------------------
+    canvas.draw_polygon([(WIDTH / 9, 25), (WIDTH / 8 - WIDTH / 9, 25), (WIDTH / 8 - WIDTH / 9, 62), (WIDTH / 9, 62)], 2, "Grey", "White")
+    # The search text drawn in the search box
+    if search_text_start_pos[0] + circuit_builder.get_canvas_textwidth(search_text, HEIGHT / 20) > WIDTH / 9:
+        search_text_start_pos = [WIDTH / 8 - WIDTH / 9, 55]
+        for char in search_text:
+            search_text_start_pos[0] -= circuit_builder.get_canvas_textwidth(char, HEIGHT / 20)
+            if search_text_start_pos[0] + circuit_builder.get_canvas_textwidth(search_text, HEIGHT / 20) <= WIDTH / 9:
+                break
+    if searching == True:
+        if text_line_drawn == True:
+            canvas.draw_line([search_text_start_pos[0] + circuit_builder.get_canvas_textwidth(search_text, HEIGHT / 20) + 2, 27], [search_text_start_pos[0] + circuit_builder.get_canvas_textwidth(search_text, HEIGHT / 20) + 2, 53], 2, rgba(100, 100, 100, 1))
+        # How to draw the search text
+            # If there is nothing in the search text, and you
+            # are not currently using the search box, then it
+            # draws a light gray "Search" in it. 
+    if (searching == False) and (len(search_text) == 0):
+        canvas.draw_text("Search", search_text_start_pos, HEIGHT / 20, rgba(150, 150, 150, 1))
+            # I began to work on making this run faster, but I couldn't 
+            # figure out what was making a bug where the text would go 
+            # out of the search box. See version 8 if you 
+            # would like to see it.(Try using capital Gs in the search 
+            # box for about ten characters.)
+    else:
+        canvas.draw_text(search_text, search_text_start_pos, HEIGHT / 20, rgba(80, 80, 80, 1))
+        canvas.draw_polygon([(0, 25), (WIDTH / 8 - WIDTH / 9 - 2, 25), (WIDTH / 8 - WIDTH / 9 - 2, 62), (0, 62)], 1, "Black", "Black")
+    # The button to delete everything in the search box
+    canvas.draw_circle([WIDTH / 8.45, 45], 8, 1, "White", "White")
+    canvas.draw_text("X", [WIDTH / 8.82, 51], 20, rgba(70, 70, 70, 1))
+    #-------------------------------------------------
+    # Parts and part sections
+    # The parts that you need for all projects
+    essentials.draw(canvas)
+        # Wire
+    wire.draw(canvas, 12)
+    canvas.draw_line([wire.pos[0] - wire.size / 2 + 10, wire.pos[1]], [wire.pos[0] + wire.size / 2 - 10, wire.pos[1]], 2, wire.color)
+    # Draw the parts that you use to build circuits
+        # Wires
+    if len(set(wire_points)) == 1:
+        canvas.draw_circle(wire_points[0], 2, 1, "Black", "Black")
+        if info == True:
+            canvas.draw_circle(wire_points[0], 5, 1, "Blue", rgba(0, 0, 255, 0.5))
+    for w in wires:
+        canvas.draw_line(w[0], w[1], 2, "Black")
+        canvas.draw_circle(w[0], 2, 1, "Black", "Black")
+        canvas.draw_circle(w[1], 2, 1, "Black", "Black")
+        if info == True:
+            canvas.draw_circle(w[0], 5, 1, "Blue", rgba(0, 0, 255, 0.5))
+            canvas.draw_circle(w[1], 5, 1, "Blue", rgba(0, 0, 255, 0.5))
+    # The bar with all of the options, the delete button, 
+    # etc.
+    canvas.draw_polygon([(WIDTH / 8, 0), (WIDTH, 0), (WIDTH, HEIGHT / 20), (WIDTH / 8, HEIGHT / 20)], 2, "Black", rgba(180, 180, 180, 1))
+    canvas.draw_line([WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, 0], [WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 20], 2, "Black")
+    canvas.draw_text("Edit", [WIDTH / 8, HEIGHT / 25], HEIGHT / 20, "Black")
+    canvas.draw_line([WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, 0], [WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, HEIGHT / 20], 2, "Black")
+    canvas.draw_text("View", [WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 25], HEIGHT / 20, "Black")
+        # Edit
+    if using_edit == True:
+        canvas.draw_polygon([(WIDTH / 8, HEIGHT / 20), (WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 20), (WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 5), (WIDTH / 8, HEIGHT / 5)], 2, "Black", rgba(180, 180, 180, 1))
+        canvas.draw_text("Delete all", [WIDTH / 8, HEIGHT / 20 + HEIGHT / 45], HEIGHT / 45, "Black")
+        canvas.draw_line([WIDTH / 8 + 1, HEIGHT / 20 + HEIGHT / 45 + 5], [WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 4, HEIGHT / 20 + HEIGHT / 45 + 5], 2, "Grey")
+    if using_view == True:
+        if info == True:
+            not_info_state = "off"
+        if info == False:
+            not_info_state = "on"
+        canvas.draw_polygon([(WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 20), (WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, HEIGHT / 20), (WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, HEIGHT / 5), (WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 5)], 2, "Black", rgba(180, 180, 180, 1))
+        canvas.draw_text("Turn info " + not_info_state, [WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 20 + HEIGHT / 45], HEIGHT / 50, "Black")
+        canvas.draw_line([WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 6, HEIGHT / 20 + HEIGHT / 45 + 5], [WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 4, HEIGHT / 20 + HEIGHT / 45 + 5], 2, "Grey")
+
+def timer_handler():
+    global time, text_line_drawn
+    time += 1
+    if searching == True:
+        if time % 50 == 0:
+            text_line_drawn = not text_line_drawn
+
+def keydown(key):
+    global search_text, shift, search_text_start_pos
+    if searching == True:
+        # Shift
+        if key == 16:
+            shift = True
+        # Delete
+        if key == 8:
+            if len(search_text) > 0:
+                search_text = string_to_list(search_text)
+                search_text.pop(-1)
+                search_text = list_to_string(search_text)
+            if search_text_start_pos[0] < WIDTH / 8 - WIDTH / 9:
+                search_text_start_pos = [WIDTH / 8 - WIDTH / 9, 55]
+        # Dash
+        if key == 173:
+            search_text += "-"
+        if key == simplegui.KEY_MAP["space"]:
+            search_text += " "
+        if key in key_mapping:
+            if shift == True:
+                search_text += key_mapping[key]
+            else:
+                search_text += key_mapping[key].lower()
+
+def keyup(key):
+    global shift
+    if key == 16:
+        shift = False
+
+def mouseclick(pos):
+    global searching, search_text, search_text_start_pos, searching, wire_place_stage, wire_points, wire_selected, using_edit, using_view, info
+    if in_square(pos, WIDTH / 8 - WIDTH / 9, WIDTH / 9, 25, 55):
+        searching = True
+    else:
+        searching = False
+    if distance(pos, [WIDTH / 8.45, 45]) <= 10:
+        search_text = ""
+        search_text_start_pos = [WIDTH / 8 - WIDTH / 9, 55]
+        searching = True
+    wire.mouseclick(pos)
+    if wire.clicked == True:
+        wire.set_color(rgba(0, 255, 100, 1))
+        wire_selected = True
+    if (wire.clicked == False) and (wire_selected == True):
+        if wire_place_stage == 1:
+            if (pos[0] > WIDTH / 8 + 2) and (pos[1] > HEIGHT / 20 + 2):
+                for w_points in wires:
+                    for w_point in w_points:
+                        if distance(w_point, pos) <= 5:
+                            wire_points.append(w_point)
+                            break
+                        else:
+                            wire_points.append(pos)
+                            break
+                else:
+                    wire_points.append(pos)
+                wires.append(wire_points)
+                wire_place_stage = 0
+            else:
+                wire.set_color("Black")
+                wire_selected = False
+                wire_place_stage = 0
+            wire_points = []
+        elif wire_place_stage == 0:
+            if (pos[0] > WIDTH / 8 + 2) and (pos[1] > HEIGHT / 20 + 2):
+                for w_points in wires:
+                    for w_point in w_points:
+                        if distance(w_point, pos) <= 5:
+                            wire_points.append(w_point)
+                            break
+                        else:
+                            wire_points.append(pos)
+                            break
+                else:
+                    wire_points.append(pos)
+                wire_place_stage += 1
+            else:
+                wire.set_color("Black")
+                wire_selected = False
+                wire_place_stage = 0
+                wire_points = []
+    if in_square(pos, WIDTH / 8, WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, 0, HEIGHT / 20):
+        using_edit, using_view = not using_edit, False
+    if in_square(pos, WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, 0, HEIGHT / 20):
+        using_view, using_edit = not using_view, False
+    if using_edit:
+        if in_square(pos, WIDTH / 8, WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, HEIGHT / 20, HEIGHT / 20 + HEIGHT / 45 + 5):
+            delete_all()
+            using_edit = False
+    if using_view:
+        if in_square(pos, WIDTH / 8 + circuit_builder.get_canvas_textwidth("Edit", HEIGHT / 20) + 5, WIDTH / 8 + circuit_builder.get_canvas_textwidth("EditView", HEIGHT / 20) + 5, HEIGHT / 20, HEIGHT / 20 + HEIGHT / 45 + 5):
+            info = not info
+            using_view = False
+
+"Globals"
+# Import modules
+import simplegui, math
+# Define variables
+WIDTH, HEIGHT = 1390, 733
+time = 0
+    # I created this key mapping using the following
+    # program: 
+    # import simplegui
+    # keys = "1234567890qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"
+    # keyIDs = []
+    # for key in keys:
+    #    keyIDs.append(simplegui.KEY_MAP[key])
+    # key_map = {}
+    # index = 0
+    # for keyID in keyIDs:
+    #     key_map[keyID] = keys[index]
+    #     index += 1
+    # print key_map
+key_mapping = {48: '0', 49: '1', 50: '2', 51: '3', 52: '4', 53: '5', 54: '6', 55: '7', 56: '8', 57: '9', 65: 'A', 66: 'B', 67: 'C', 68: 'D', 69: 'E', 70: 'F', 71: 'G', 72: 'H', 73: 'I', 74: 'J', 75: 'K', 76: 'L', 77: 'M', 78: 'N', 79: 'O', 80: 'P', 81: 'Q', 82: 'R', 83: 'S', 84: 'T', 85: 'U', 86: 'V', 87: 'W', 88: 'X', 89: 'Y', 90: 'Z'}
+search_text = ""
+search_text_start_pos = [WIDTH / 8 - WIDTH / 9, 55]
+searching = False
+search_scroll_pos = 0
+text_line_drawn = False
+essentials = Parts.PartsSection("Essentials", 0)
+wire = Parts.Part("Wire", [WIDTH / 40, 35])
+shift = False
+wire_selected = False
+wires = []
+wire_place_stage = 0
+wire_points = []
+using_edit = False
+using_view = False
+info = False
+# Create the frame, initialize handlers, and start the frame
+circuit_builder = simplegui.create_frame("Circuit Builder", WIDTH, HEIGHT, 0)
+timer = simplegui.create_timer(10, timer_handler)
+circuit_builder.set_draw_handler(draw)
+circuit_builder.set_keydown_handler(keydown)
+circuit_builder.set_keyup_handler(keyup)
+circuit_builder.set_mouseclick_handler(mouseclick)
+circuit_builder.set_canvas_background("White")
+timer.start()
+circuit_builder.start()
